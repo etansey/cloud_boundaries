@@ -25,5 +25,8 @@ def calc_5min_cloudboundaries(t_loop, a_pts, thresh, cloud_top, cloud_base, inde
         if ~np.isnan(cloud_top_5min[t_loop,index]):       # >>> exclude CBHs that are above median CTH
             bases_tmp[(bases_tmp>cloud_top_5min[t_loop,index])] = np.nan
         cloud_base_5min[t_loop,index] = np.nanmedian(bases_tmp)
+        # >>> for clouds with no CTH available, store filler value (CBH + 300 m?)
+        if np.isnan(cloud_top_5min[t_loop,index]):
+            cloud_top_5min[t_loop,index] = np.nanmedian(bases_tmp) + 300
 
     return(cloud_top_5min, cloud_base_5min)

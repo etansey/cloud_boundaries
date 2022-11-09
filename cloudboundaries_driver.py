@@ -1,4 +1,6 @@
 import numpy as np
+from netCDF4 import Dataset  # http://code.google.com/p/netcdf4-python/
+import pandas as pd
 
 def radar_lidar_DQ_bitunpack(RADAR_LIDAR_BOUNDARIES_data_quality_flag):
     '''
@@ -28,6 +30,8 @@ def radar_lidar_DQ_bitunpack(RADAR_LIDAR_BOUNDARIES_data_quality_flag):
 rpath = '/home/fenwick/datasets/MICRE/Marchand_Retrievals/V1.95/NetCDF/'
 all_rdata = np.array([f for f in os.listdir(rpath) if f.startswith("Cloud_and_Precipitation_Properties_MICRE_V1.95")])
 all_rdata.sort()
+    # >>> save output here:
+savepath = '/your/save/directory/'
 #___________________________________________________________________________________________________________________________________________
         # >>> loop through all radar-lidar merged data files ... run cloud boundaries function
 for rfile in all_rdata:
@@ -45,6 +49,7 @@ for rfile in all_rdata:
     b1, b2, b3          = radar_lidar_DQ_bitunpack(boundaries_DQ) # >>> process DQ flags: b1=1 -> ceil missing/not used
                                                                   # >>>                   b2=2 -> radar missing/not used
                                                                   # >>>                   b3=3 -> max layers exceeded
+    print(len(boundaries_time_gmt))
     # >>> 5-MINUTE TIME ARRAY
     tstep_minutes = 5
     dt = tstep_minutes*60/3600   # >>> seconds
@@ -59,17 +64,23 @@ for rfile in all_rdata:
         a_pts = np.where(abs(boundaries_time_gmt - time_gmt[t_loop]) <= 0.5*dt )[0] # >>> indices in 5-minute period
         ceil_n_tmp = np.copy(ceil_n_layers[a_pts])
 
-        # >>> cloud layer 1
+        # >>> layer 1
         cloud_top_5min, cloud_base_5min = calc_5min_cloudboundaries(t_loop, a_pts, 5, cloud_top, cloud_base, 0, cloud_top_5min, cloud_base_5min)
-        if np.isnan(cloud_base_5min[t_loop,0]) and ~np.isnan(cloud_top_5min[t_loop,0]):
-            print(date, '   top', cloud_top_5min[t_loop,0], '   base', cloud_base_5min[t_loop,0], '\n', cloud_base[a_pts,0], '\n\n')
+
             # >>> minimum 1 minute of multi-layer cloud present?
         if len(boundaries_n_layers[a_pts][boundaries_n_layers[a_pts]>1]) >= 5:
-            # >>> cloud layer 2
+            # >>> layer 2
             cloud_top_5min, cloud_base_5min = calc_5min_cloudboundaries(t_loop, a_pts, 5, cloud_top, cloud_base, 1, cloud_top_5min, cloud_base_5min)
-            # >>> cloud layer 3
+            # >>> layer 3
             cloud_top_5min, cloud_base_5min = calc_5min_cloudboundaries(t_loop, a_pts, 5, cloud_top, cloud_base, 2, cloud_top_5min, cloud_base_5min)
-            # >>> cloud layer 4
+            # >>> layer 4
             cloud_top_5min, cloud_base_5min = calc_5min_cloudboundaries(t_loop, a_pts, 5, cloud_top, cloud_base, 3, cloud_top_5min, cloud_base_5min)
-            # >>> cloud layer 5
+            # >>> layer 5
             cloud_top_5min, cloud_base_5min = calc_5min_cloudboundaries(t_loop, a_pts, 5, cloud_top, cloud_base, 4, cloud_top_5min, cloud_base_5min)
+
+    ser = pd.DataFrame({'time_gmt': time_gmt, 'layer1_cloud_top': cloud_top_5min[:,0], 'layer1_cloud_base': cloud_base_5min[:,0],
+                       'layer2_cloud_top': cloud_top_5min[:,1], 'layer2_cloud_base': cloud_base_5min[:,1],
+                       'layer3_cloud_top': cloud_top_5min[:,2], 'layer3_cloud_base': cloud_base_5min[:,2],
+                       'layer4_cloud_top': cloud_top_5min[:,3], 'layer4_cloud_base': cloud_base_5min[:,3],
+                       'layer5_cloud_top': cloud_top_5min[:,4], 'layer5_cloud_base': cloud_base_5min[:,4]})
+    ser.to_csv(savepath + 'cloudboundaries_%s.csv' % date, index=False, header=True)
